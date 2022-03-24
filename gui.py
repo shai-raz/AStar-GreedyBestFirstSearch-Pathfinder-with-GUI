@@ -156,7 +156,7 @@ class Frame():
 
     def save(self):
         with(open("input.txt", "w+")) as f:
-            f.write("A*\n")
+            f.write(f"{self.algorithm}\n")
             f.write(str(self.num_of_rows) + "\n")
 
             for row in self.grid:
