@@ -219,8 +219,7 @@ class AStar:
             if q is not None:
                 successors = [
                     successor for successor in successors
-                    if successor not in closed
-                    and successor not in opened]
+                    if successor not in closed]
                 q.put((node, parents, successors))
 
             for successor in successors:
@@ -245,6 +244,8 @@ class AStar:
                                 opened[i] = (f, successor)
                                 parents[successor] = node
                                 break
+
+            
 
         return "no path", 0
 
