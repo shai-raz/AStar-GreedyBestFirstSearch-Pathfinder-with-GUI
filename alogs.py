@@ -1,6 +1,9 @@
 import sys
 from heapq import heappush, heappop
 from time import sleep
+import threading
+from multiprocessing import Queue
+
 
 MAP_DICT = {
     "STARTING_POINT": 'A',
@@ -58,10 +61,9 @@ def get_successors(node, closed, grid, size):
 
     return successors
 
-# checks if the child is an ancestor of the node
-
 
 def is_ancestor(node, child, parents):
+    """checks if the child is an ancestor of the node"""
     while node is not None:
         if node == child:
             return True
@@ -72,7 +74,7 @@ class GreedyBestFirstSearch:
     closed = []
 
     def __init__(self, grid, size):
-        self.grid = grid
+        self.grid = [row[:] for row in grid]  # deep copy
         self.size = size
 
         self.start, self.end = find_start_and_end(grid)
@@ -108,7 +110,7 @@ class GreedyBestFirstSearch:
 
         return '-'.join(dir_path), cost
 
-    def run(self):
+    def run(self, q=None):
         opened = []
         closed = []
 
@@ -125,10 +127,16 @@ class GreedyBestFirstSearch:
 
             # if the current node is the end node, return the path
             if node == self.end:
-                return self.get_path(node, parents)
+                path, cost = self.get_path(node, parents)
+                q.put(("end", node, parents, cost))
+                return path, cost
 
             # get successors
             successors = self.get_successors(node, closed)
+
+            if q is not None:
+                q.put((node, parents, successors))
+
             for successor in successors:
                 h = self.get_heuristic(successor)
                 if (h, successor) not in opened:
@@ -140,7 +148,7 @@ class GreedyBestFirstSearch:
 
 class AStar:
     def __init__(self, grid, size):
-        self.grid = grid
+        self.grid = [row[:] for row in grid]  # deep copy
         self.size = size
         self.start, self.end = find_start_and_end(grid)
 
@@ -182,7 +190,7 @@ class AStar:
 
         return '-'.join(dir_path), cost
 
-    def run(self):
+    def run(self, q=None):
         opened = []
         closed = []
 
@@ -193,16 +201,27 @@ class AStar:
         heappush(opened, (self.get_heuristic(self.start), self.start))
 
         while len(opened) > 0:
+            sleep(0.0001)
             # set current node
             node = heappop(opened)[1]
             closed.append(node)
 
             # if the current node is the end node, return the path
             if node == self.end:
-                return self.get_path(node, parents)
+                path, cost = self.get_path(node, parents)
+                q.put(("end", node, parents, cost))
+                return path, cost
 
             # get successors
             successors = self.get_successors(node)
+
+            if q is not None:
+                successors = [
+                    successor for successor in successors
+                    if successor not in closed
+                    and successor not in opened]
+                q.put((node, parents, successors))
+
             for successor in successors:
                 # make sure the child isnt an ancestor of the node,
                 # to avoid infinite looping
