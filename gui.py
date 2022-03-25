@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import messagebox
 import alogs
 from alogs import AStar, GreedyBestFirstSearch, MAP_DICT, is_ancestor
 import os
@@ -235,8 +236,9 @@ class Frame():
         self.display_grid = [row[:] for row in self.grid]
         self.num_of_rows = size
         self.num_of_cols = size
-        self.update_status_bar()
         self.color_grid()
+        self.cost = None
+        self.update_status_bar()
 
     def save(self):
         with(open("input.txt", "w+")) as f:
@@ -249,9 +251,14 @@ class Frame():
             f.truncate(f.tell()-len(os.linesep))
 
     def run(self):
+        if alogs.find_start_and_end(self.grid)[0] is None or alogs.find_start_and_end(self.grid)[1] is None:
+            tk.messagebox.showerror("Error", "Missing starting and/or ending point(s)")
+            return
         self.is_running = True
         self.is_dirty = True
 
+        self.cost = None
+        self.update_status_bar()
         self.reset_display_grid()
         self.color_grid()
 
@@ -270,6 +277,9 @@ class Frame():
                 self.grid[y][x] = MAP_DICT["PAVED_ROAD"]
                 self.display_grid[y][x] = MAP_DICT["PAVED_ROAD"]
         self.color_grid()
+
+        self.cost = None
+        self.update_status_bar()
 
     def update_grid_by_algo_run(self, node, parents, successors):
         # set node color

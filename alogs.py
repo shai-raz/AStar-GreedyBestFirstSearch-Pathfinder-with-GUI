@@ -29,6 +29,7 @@ PATH_DICT = {
 
 
 def find_start_and_end(grid):
+    start, end = None, None
     for j, row in enumerate(grid):
         for i, cell in enumerate(row):
             if cell == MAP_DICT["STARTING_POINT"]:
