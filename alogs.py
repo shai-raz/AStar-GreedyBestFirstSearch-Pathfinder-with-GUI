@@ -40,111 +40,133 @@ def find_start_and_end(grid):
     return start, end
 
 
-def get_manhattan_distance(node, goal):
-    return abs(node[0] - goal[0]) + abs(node[1] - goal[1])
+def get_manhattan_distance(pos, goal):
+    return abs(pos[0] - goal[0]) + abs(pos[1] - goal[1])
 
 
-def get_successors(node, closed, grid, size):
+def get_successors(node, grid, size):
     successors = []
-    x, y = node[0], node[1]
+    x, y = node.x, node.y
 
-    if (x + 1 < size) and (grid[y][x + 1] != MAP_DICT["WATER"]) and ((x+1, y) not in closed):
+    if (x + 1 < size) and (grid[y][x + 1] != MAP_DICT["WATER"]):
         successors.append((x + 1, y))
 
-    if (x - 1 >= 0) and (grid[y][x - 1] != MAP_DICT["WATER"]) and ((x-1, y) not in closed):
+    if (x - 1 >= 0) and (grid[y][x - 1] != MAP_DICT["WATER"]):
         successors.append((x - 1, y))
 
-    if (y + 1 < size) and (grid[y + 1][x] != MAP_DICT["WATER"]) and ((x, y+1) not in closed):
+    if (y + 1 < size) and (grid[y + 1][x] != MAP_DICT["WATER"]):
         successors.append((x, y + 1))
 
-    if (y - 1 >= 0) and (grid[y - 1][x] != MAP_DICT["WATER"]) and ((x, y-1) not in closed):
+    if (y - 1 >= 0) and (grid[y - 1][x] != MAP_DICT["WATER"]):
         successors.append((x, y - 1))
 
     return successors
 
 
-def is_ancestor(node, child, parents):
-    """checks if the child is an ancestor of the node"""
+def get_path(node, grid):
+    path = []
+    cost = 0
     while node is not None:
-        if node == child:
-            return True
-        node = parents[node]
+        path.append(node)
+        node = node.parent
+
+    path = path[::-1]
+    dir_path = []
+    for i in range(len(path)-1):
+        cost += COST_DICT[grid[path[i].y][path[i].x]]
+
+        new_x = path[i+1].x - path[i].x
+        new_y = path[i+1].y - path[i].y
+        if new_x == 1:
+            dir_path.append(PATH_DICT["RIGHT"])
+        elif new_x == -1:
+            dir_path.append(PATH_DICT["LEFT"])
+        elif new_y == 1:
+            dir_path.append(PATH_DICT["DOWN"])
+        elif new_y == -1:
+            dir_path.append(PATH_DICT["UP"])
+
+    return '-'.join(dir_path), cost
+
+
+class Node:
+    def __init__(self, x, y, h, cost=0, parent=None):
+        self.x = x
+        self.y = y
+        self.h = h
+        self.g = cost + parent.g if parent else 0
+        self.f = h+self.g
+        self.parent = parent
+
+    def __lt__(self, other):
+        return self.f < other.f
 
 
 class GreedyBestFirstSearch:
-    closed = []
-
     def __init__(self, grid, size):
         self.grid = [row[:] for row in grid]  # deep copy
         self.size = size
 
         self.start, self.end = find_start_and_end(grid)
 
-    def get_successors(self, node, closed):
-        return get_successors(node, closed, self.grid, self.size)
+    def get_successors(self, node):
+        return get_successors(node, self.grid, self.size)
 
-    def get_heuristic(self, node):
-        return get_manhattan_distance(node, self.end)
+    def get_heuristic(self, pos):
+        return get_manhattan_distance(pos, self.end)
 
-    def get_path(self, node, parents):
-        path = []
+    def get_path_cost(self, node):
         cost = 0
         while node is not None:
-            path.append(node)
-            node = parents[node]
+            cost += COST_DICT[self.grid[node.y][node.x]]
+            node = node.parent
 
-        path = path[::-1]
-        dir_path = []
-        for i in range(len(path)-1):
-            cost += COST_DICT[self.grid[path[i][1]][path[i][0]]]
-
-            new_x = path[i+1][0] - path[i][0]
-            new_y = path[i+1][1] - path[i][1]
-            if new_x == 1:
-                dir_path.append(PATH_DICT["RIGHT"])
-            elif new_x == -1:
-                dir_path.append(PATH_DICT["LEFT"])
-            elif new_y == 1:
-                dir_path.append(PATH_DICT["DOWN"])
-            elif new_y == -1:
-                dir_path.append(PATH_DICT["UP"])
-
-        return '-'.join(dir_path), cost
+        return cost
 
     def run(self, q=None):
         opened = []
         closed = []
 
-        # dictionary to store parents (to get the path), key = node, value = parent
-        parents = {}
-        parents[self.start] = None
-
-        heappush(opened, (self.get_heuristic(self.start), self.start))
+        h = self.get_heuristic(self.start)
+        heappush(opened, Node(self.start[0], self.start[1], h))
 
         while len(opened) > 0:
             # set current node
-            node = heappop(opened)[1]
+            node = heappop(opened)
             closed.append(node)
 
             # if the current node is the end node, return the path
-            if node == self.end:
-                path, cost = self.get_path(node, parents)
-                q.put(("end", node, parents, cost))
-                return path, cost
+            if node.x == self.end[0] and node.y == self.end[1]:
+                q.put(("end", node, self.get_path_cost(node)))
+                return
 
             # get successors
-            successors = self.get_successors(node, closed)
+            successors = self.get_successors(node)
 
             if q is not None:
-                q.put((node, parents, successors))
+                q.put((node, successors))
 
             for successor in successors:
-                h = self.get_heuristic(successor)
-                if (h, successor) not in opened:
-                    heappush(opened, (h, successor))
-                    parents[successor] = node
+                inOpened = False
+                inClosed = False
 
-        return "no path", 0
+                # check if in opened
+                for i in range(len(opened)):
+                    if opened[i].x == successor[0] and opened[i].y == successor[1]:
+                        inOpened = True
+                        break
+
+                # check if in closed
+                for i in range(len(closed)):
+                    if closed[i].x == successor[0] and closed[i].y == successor[1]:
+                        inClosed = True
+                        break
+
+                if not inOpened and not inClosed:
+                    heappush(opened, Node(successor[0], successor[1],
+                                          self.get_heuristic(successor), parent=node))
+
+        return False
 
 
 class AStar:
@@ -154,100 +176,61 @@ class AStar:
         self.start, self.end = find_start_and_end(grid)
 
     def get_successors(self, node):
-        return get_successors(node, [], self.grid, self.size)
+        return get_successors(node, self.grid, self.size)
 
-    def get_heuristic(self, node):
-        return get_manhattan_distance(node, self.end)
-
-    def get_g(self, node, parents):
-        g = 0
-        while node is not None:
-            g += COST_DICT[self.grid[node[1]][node[0]]]
-            node = parents[node]
-        return g
-
-    def get_path(self, node, parents):
-        path = []
-        cost = 0
-        while node is not None:
-            path.append(node)
-            node = parents[node]
-
-        path = path[::-1]
-        dir_path = []
-        for i in range(len(path)-1):
-            cost += COST_DICT[self.grid[path[i][1]][path[i][0]]]
-
-            new_x = path[i+1][0] - path[i][0]
-            new_y = path[i+1][1] - path[i][1]
-            if new_x == 1:
-                dir_path.append(PATH_DICT["RIGHT"])
-            elif new_x == -1:
-                dir_path.append(PATH_DICT["LEFT"])
-            elif new_y == 1:
-                dir_path.append(PATH_DICT["DOWN"])
-            elif new_y == -1:
-                dir_path.append(PATH_DICT["UP"])
-
-        return '-'.join(dir_path), cost
+    def get_heuristic(self, pos):
+        return get_manhattan_distance(pos, self.end)
 
     def run(self, q=None):
         opened = []
         closed = []
 
-        # dictionary to store parents (to get the path), key = node, value = parent
-        parents = {}
-        parents[self.start] = None
-
-        heappush(opened, (self.get_heuristic(self.start), self.start))
+        h = self.get_heuristic(self.start)
+        node = Node(self.start[0], self.start[1], h)
+        heappush(opened, node)
 
         while len(opened) > 0:
-            sleep(0.0001)
             # set current node
-            node = heappop(opened)[1]
+            node = heappop(opened)
             closed.append(node)
 
             # if the current node is the end node, return the path
-            if node == self.end:
-                path, cost = self.get_path(node, parents)
-                q.put(("end", node, parents, cost))
-                return path, cost
+            if node.x == self.end[0] and node.y == self.end[1]:
+                q.put(("end", node, node.g))
+                return True
 
             # get successors
             successors = self.get_successors(node)
 
             if q is not None:
-                successors = [
-                    successor for successor in successors
-                    if successor not in closed]
-                q.put((node, parents, successors))
+                q.put((node, successors))
 
             for successor in successors:
-                # make sure the child isnt an ancestor of the node,
-                # to avoid infinite looping
-                if is_ancestor(node, successor, parents):
-                    continue
-                new_parents = parents.copy()
-                new_parents[successor] = node
-                g = self.get_g(successor, new_parents)
                 h = self.get_heuristic(successor)
-                f = g + h
-                if (f, successor) not in opened and successor not in closed:
-                    heappush(opened, (f, successor))
-                    parents[successor] = node
-                else:
-                    # find the node in the opened list
-                    for i in range(len(opened)):
-                        if opened[i][1] == successor:
-                            # if the new f value is smaller, update the node
-                            if f < opened[i][0]:
-                                opened[i] = (f, successor)
-                                parents[successor] = node
-                                break
+                cost = COST_DICT[self.grid[successor[1]][successor[0]]]
+                successor = Node(successor[0], successor[1], h, cost, node)
 
-            
+                inOpened = False
+                inClosed = False
 
-        return "no path", 0
+                for i in range(len(opened)):
+                    if opened[i].x == successor.x and opened[i].y == successor.y:
+                        inOpened = True
+                        if opened[i].f > successor.f:
+                            opened[i] = successor
+                            break
+
+                for i in range(len(closed)):
+                    if closed[i].x == successor.x and closed[i].y == successor.y:
+                        inClosed = True
+                        if closed[i].f > successor.f:
+                            closed[i] = successor
+                            break
+
+                if not inOpened and not inClosed:
+                    heappush(opened, successor)
+
+        return False
 
 
 def read_file(file_name):
@@ -260,44 +243,3 @@ def read_file(file_name):
     grid = [[letter for letter in row.strip()] for row in input_mat]
 
     return algorithm, size, grid
-
-
-def main():
-    if (len(sys.argv) != 2):
-        print('Usage: py assignment1.py <input_file>')
-        exit(1)
-
-    file_name = sys.argv[1]
-
-    algorithm, size, grid = read_file(file_name)
-
-    # presenting the input
-    print(f"Running {algorithm} on {size}x{size} matrix: ")
-    for row in grid:
-        for letter in row:
-            print(f"{letter} ", end='')
-        print()
-
-    path = ""
-    cost = 0
-
-    # running the alogrithm
-    if algorithm == 'A*':
-        astar = AStar(grid, size)
-        path, cost = astar.run()
-    elif algorithm == 'greedyBestFirst':
-        gbs = GreedyBestFirstSearch(grid, size)
-        path, cost = gbs.run()
-
-    print("path: ", path)
-    print("cost: ", cost)
-
-    with(open("output.txt", "w+")) as f:
-        if path == "no path":
-            f.write("no path")
-        else:
-            f.write(path + " " + str(cost))
-
-
-if __name__ == '__main__':
-    main()

@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import messagebox
 import alogs
-from alogs import AStar, GreedyBestFirstSearch, MAP_DICT, is_ancestor
+from alogs import AStar, GreedyBestFirstSearch, MAP_DICT, Node
 import os
 import time
 from threading import Thread
@@ -159,44 +159,22 @@ class Frame():
         if items:
             self.update_cell(items, True)
 
-    # def display_path(self, path):
-    #     '''Display a path according to output.txt instructions'''
-    #     path = path.split("-")
-
-    #     start = alogs.find_start_and_end(self.grid)[0]
-    #     current = start
-
-    #     for move in path:
-    #         if move == "R":
-    #             current = (current[0] + 1, current[1])
-    #         elif move == "L":
-    #             current = (current[0] - 1, current[1])
-    #         elif move == "U":
-    #             current = (current[0], current[1] - 1)
-    #         elif move == "D":
-    #             current = (current[0], current[1] + 1)
-
-    #         if self.grid[current[1]][current[0]] == MAP_DICT["ENDING_POINT"]:
-    #             break
-    #         self.c.itemconfigure(
-    #             current[0] + current[1] * self.num_of_cols + 1, fill="magenta")
-
-    def display_path_by_parents(self, node, parents):
+    def display_path(self, node):
         path = []
         while node is not None:
             path.append(node)
-            node = parents[node]
+            node = node.parent
 
         path = path[::-1]
 
         for node in path:
-            if self.grid[node[1]][node[0]] == MAP_DICT["ENDING_POINT"]:
-                self.display_grid[node[1]][node[0]] = MAP_DICT["ENDING_POINT"]
-            elif self.grid[node[1]][node[0]] == MAP_DICT["STARTING_POINT"]:
-                self.display_grid[node[1]][node[0]
-                                           ] = MAP_DICT["STARTING_POINT"]
+            if self.grid[node.y][node.x] == MAP_DICT["ENDING_POINT"]:
+                self.display_grid[node.y][node.x] = MAP_DICT["ENDING_POINT"]
+            elif self.grid[node.y][node.x] == MAP_DICT["STARTING_POINT"]:
+                self.display_grid[node.y][node.x] = MAP_DICT["STARTING_POINT"]
             else:
-                self.display_grid[node[1]][node[0]] = VISU_DICT["PATH"]
+                self.display_grid[node.y][node.x] = VISU_DICT["PATH"]
+
 
     def refresh_grid(self):
         '''Checks if there are any new items to be added to the canvas,
@@ -211,14 +189,14 @@ class Frame():
 
         for item in items:
             if item[0] == "end":
-                node, parents, cost = item[1], item[2], item[3]
-                self.display_path_by_parents(node, parents)
+                node, cost = item[1], item[2]
+                self.display_path(node)
                 self.is_running = False
                 self.cost = cost
                 self.update_status_bar()
             else:
-                node, parents, successors = item
-                self.update_grid_by_algo_run(node, parents, successors)
+                node, successors = item
+                self.update_grid_by_algo_run(successors)
 
         if len(items) > 0:
             self.color_grid()
@@ -311,12 +289,12 @@ class Frame():
         self.cost = None
         self.update_status_bar()
 
-    def update_grid_by_algo_run(self, node, parents, successors):
+    def update_grid_by_algo_run(self, successors):
         # set node color
         # self.grid[node[1]][node[0]] = VISU_DICT["VISITED"]
 
         successors = [
-            s for s in successors if not is_ancestor(node, s, parents)]
+            s for s in successors]
 
         for s in successors:
             self.display_grid[s[1]][s[0]] = VISU_DICT["SUCCESSOR"]
