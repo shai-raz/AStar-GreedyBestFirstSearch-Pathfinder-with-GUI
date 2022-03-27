@@ -239,6 +239,9 @@ class Frame():
         self.display_grid = [row[:] for row in self.grid]
 
     def load(self):
+        if self.is_running:
+            return
+        
         self.algorithm, size, self.grid = alogs.read_file("input.txt")
         self.display_grid = [row[:] for row in self.grid]
         self.num_of_rows = size
@@ -258,10 +261,14 @@ class Frame():
             f.truncate(f.tell()-len(os.linesep))
 
     def run(self):
+        if self.is_running:
+            return
+        
         if alogs.find_start_and_end(self.grid)[0] is None or alogs.find_start_and_end(self.grid)[1] is None:
             tk.messagebox.showerror(
                 "Error", "Missing starting and/or ending point(s)")
             return
+        
         self.is_running = True
         self.is_dirty = True
 
@@ -280,6 +287,9 @@ class Frame():
         algo_thread.start()
 
     def reset(self):
+        if self.is_running:
+            return
+        
         for y in range(self.num_of_rows):
             for x in range(self.num_of_cols):
                 self.grid[y][x] = MAP_DICT["PAVED_ROAD"]
