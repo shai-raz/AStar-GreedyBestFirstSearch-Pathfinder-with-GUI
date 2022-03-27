@@ -26,7 +26,6 @@ VISU_DICT = {
 
 COLOR_ID = ['R', 'W', 'D', 'A', 'B']  # order of cycling clicks
 
-
 class Frame():
     num_of_rows = 0
     num_of_cols = 0
@@ -53,8 +52,17 @@ class Frame():
         self.display_grid = []  # grid to display on canvas
 
         self.queue = Queue()
-        self.is_running = False # is the algorithm currently running
-        self.is_dirty = False # is the grid dirty (path is shown)
+        self.visu_speed = 2 # higher = faster. deteremines how fast the visualization runs
+        self.is_running = False  # is the algorithm currently running
+        self.is_dirty = False  # is the grid dirty (path is shown)
+
+        # add label
+        # self.label = tk.Label(root, text="Speed:", font=("Helvetica", 16))
+        # self.label.pack(side=tk.TOP)
+        # # add input box
+        # self.input_box = tk.Entry(root)
+        # self.input_box.pack(side=tk.TOP, fill=tk.X)
+
 
         # Setup Canvas
         self.c = tk.Canvas(root, height=600, width=600, bg='white')
@@ -73,9 +81,10 @@ class Frame():
 
         # Setup binds
         self.c.bind("<ButtonPress-1>", self.left_click)
+        self.c.bind("<ButtonPress-3>", self.right_click)
         self.c.bind("<B1-Motion>", self.left_click_drag)
 
-        self.root.after(10, self.refresh_grid)
+        self.root.after(0, self.refresh_grid)
 
     def update_status_bar(self):
         value = f"Algorithm: {self.algorithm}"
@@ -84,7 +93,13 @@ class Frame():
 
     def set_algorithm(self, algo):
         self.algorithm = algo
+        self.cost = None
         self.update_status_bar()
+
+        if algo == "A*":
+            self.visu_speed = 2
+        elif algo == "greedyBestFirst":
+            self.visu_speed = 1
 
     def get_pos_in_grid(self, item):
         item = item[0] - 1
@@ -109,6 +124,15 @@ class Frame():
         rect_id = items[0]
         self.c.itemconfigure(rect_id, fill=next_color)
 
+    def right_click(self, event):
+        if self.is_running:
+            return
+
+        if self.is_dirty:
+            self.reset_display_grid()
+            self.color_grid()
+            self.is_dirty = False
+
     def left_click(self, event):
         if self.is_running:
             return
@@ -130,7 +154,7 @@ class Frame():
             self.reset_display_grid()
             self.color_grid()
             self.is_dirty = False
-        
+
         items = self.c.find_closest(event.x, event.y)
         if items:
             self.update_cell(items, True)
@@ -169,17 +193,23 @@ class Frame():
             if self.grid[node[1]][node[0]] == MAP_DICT["ENDING_POINT"]:
                 self.display_grid[node[1]][node[0]] = MAP_DICT["ENDING_POINT"]
             elif self.grid[node[1]][node[0]] == MAP_DICT["STARTING_POINT"]:
-                self.display_grid[node[1]][node[0]] = MAP_DICT["STARTING_POINT"]
+                self.display_grid[node[1]][node[0]
+                                           ] = MAP_DICT["STARTING_POINT"]
             else:
                 self.display_grid[node[1]][node[0]] = VISU_DICT["PATH"]
-
 
     def refresh_grid(self):
         '''Checks if there are any new items to be added to the canvas,
          and colors the grid if so'''
-        try:
-            item = self.queue.get_nowait()
+        items = []
 
+        for _ in range(self.visu_speed):
+            try:
+                items.append(self.queue.get_nowait())
+            except:
+                pass
+
+        for item in items:
             if item[0] == "end":
                 node, parents, cost = item[1], item[2], item[3]
                 self.display_path_by_parents(node, parents)
@@ -190,11 +220,10 @@ class Frame():
                 node, parents, successors = item
                 self.update_grid_by_algo_run(node, parents, successors)
 
+        if len(items) > 0:
             self.color_grid()
-        except:
-            pass
 
-        self.root.after(5, self.refresh_grid)
+        self.root.after(10, self.refresh_grid)
 
     def color_grid(self):
         '''Color the grid according to display_grid'''
@@ -252,7 +281,8 @@ class Frame():
 
     def run(self):
         if alogs.find_start_and_end(self.grid)[0] is None or alogs.find_start_and_end(self.grid)[1] is None:
-            tk.messagebox.showerror("Error", "Missing starting and/or ending point(s)")
+            tk.messagebox.showerror(
+                "Error", "Missing starting and/or ending point(s)")
             return
         self.is_running = True
         self.is_dirty = True
